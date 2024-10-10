@@ -8,19 +8,48 @@ GLFWwindow* window;
 
 const char * vertexShaderSource = R""""(
 #version 460 core
-layout (location=0) in vec3 aPos;
+struct Vert {
+    float position[3];
+    float uv[2];
+};
+
+layout (binding = 0, std430) buffer ssbo {
+    Vert[] verts;
+};
+
+out vec2 uv;
+
+vec3 unpackPos(){
+    return vec3(
+        verts[gl_VertexID].position[0],
+        verts[gl_VertexID].position[1],
+        verts[gl_VertexID].position[2]
+    );
+}
+
+vec2 unpackUv(){
+    return vec2(
+        verts[gl_VertexID].position[0],
+        verts[gl_VertexID].position[1]
+    );
+}
+
 void main(){
-    gl_Position = vec4(aPos, 1.0f);
+    gl_Position = vec4(unpackPos(), 1.0f);
+    uv = unpackUv();
 }
 )"""";
 
 
 const char * fragShaderSource = R""""(
 #version 460 core
+in vec2 uv;
+
 out vec4 FragColor;
 
 void main(){
-    FragColor = vec4(1.0f, 0.5f, 0.2f, 1.0f);
+    // FragColor = vec4(1.0f, 0.5f, 0.2f, 1.0f);
+    FragColor = vec4((uv.xy+1.0f)/2.0f, 0.0f, 1.0f);
 }
 )"""";          
 
@@ -79,7 +108,6 @@ bool init(){
         return false;
     }
 
-    // auto monitor = glfwGetPrimaryMonitor();
     window = glfwCreateWindow(400, 400, "Hello, world!", NULL, NULL);
 
     glfwSetKeyCallback(window, keyHandler);
@@ -112,22 +140,19 @@ bool init(){
 
 void loop(){
     // Triangle vertex data
-    float triangleVerts[] = {
-        -1, -1, 0.0,
-         1, -1, 0.0,
-         0,  1, 0.0
+    struct {
+        float pos[3];
+        float uv[2];
+    } triangleVerts[] = {
+        { {-1, -1, 0}, {-1, -1} },
+        { { 1, -1, 0}, { 1, -1} },
+        { { 0,  1, 0}, { 0,  1} },
     };
 
-    GLuint vao;
-    glGenVertexArrays(1, &vao);
-    glBindVertexArray(vao);
-
-    GLuint vbo;
-
-    glGenBuffers(1, &vbo);
-    glBindBuffer(GL_ARRAY_BUFFER, vbo);
-    glBufferData(GL_ARRAY_BUFFER, sizeof(triangleVerts), triangleVerts, GL_STREAM_DRAW); // Stream draw cause the data will change every frame
-    glBindBufferBase(GL_ARRAY_BUFFER, 0, vbo);
+    GLuint ssbo;
+    glCreateBuffers(1, &ssbo);
+    glNamedBufferStorage(ssbo, sizeof(triangleVerts), triangleVerts, GL_DYNAMIC_STORAGE_BIT);
+    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 0, ssbo);
 
     unsigned int shaderProg = glCreateProgram();
     {
@@ -153,27 +178,19 @@ void loop(){
         if(result == GL_FALSE) return;
     }
 
-    // Set up stride, data types, etc in our buffer
-    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3*sizeof(float), (void*)0);
-    glEnableVertexAttribArray(0);
-
     while(!glfwWindowShouldClose(window)){
         // Wiggle the top of the triangle and refresh the GPU's data
-        triangleVerts[6] = sin(glfwGetTime()/1);
-        glBufferSubData(GL_ARRAY_BUFFER, 6*sizeof(float), sizeof(float), &triangleVerts[6]);
+        // triangleVerts[6] = sin(glfwGetTime()/1);
+        // glBufferSubData(GL_SHADER_STORAGE_BUFFER, 6*sizeof(float), sizeof(float), &triangleVerts[6]);
 
         // Actually clear the render buffer
         glClear(GL_COLOR_BUFFER_BIT);
         
         // Set the shader to use
         glUseProgram(shaderProg);
-        // Use the vao we set up
-        glBindVertexArray(vao);
         // Draw the triangle
         glDrawArrays(GL_TRIANGLES, 0 ,3);
 
-        // Unbind vao
-        glBindVertexArray(0);
         // Swap render and display buffers
         glfwSwapBuffers(window);
 
@@ -181,8 +198,8 @@ void loop(){
     }
     
 
-    // Unbind the storage buffer from vbo
-    glBindBuffer(GL_ARRAY_BUFFER, 0);
+    // Unbind the storage buffer from ssbo
+    glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
 }
 
 int main()
