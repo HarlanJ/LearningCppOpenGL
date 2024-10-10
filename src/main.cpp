@@ -62,9 +62,12 @@ void keyHandler(GLFWwindow* window, int key, int scancode, int action, int modes
     }
 }
 
-void glfwErrorPrinter(int code, const char* desc)
-{
+void glfwErrorPrinter(int code, const char* desc){
     printf("Error code: %d\n%s\n", code, desc);
+}
+
+void glErrorPrinter(GLenum source, GLenum type, GLuint id, GLenum severity, GLsizei length, const GLchar* message, const void * userParam){
+    printf("GL error\n\tsource: %d\n\ttype: %d\n\tid: %d\n\tseverity: %d\n\t%s", source, type, id, severity, message);
 }
 
 bool init(){
@@ -89,7 +92,10 @@ bool init(){
         glfwTerminate();
         printf("Failed to get GL Loader\n");
         return false;
+
     }
+
+    glDebugMessageCallback(glErrorPrinter, nullptr);
 
     // Enable V-Sync
     glfwSwapInterval(1);
@@ -99,6 +105,7 @@ bool init(){
 
     // Set the bg color
     glClearColor(.1, .1, .1, 0.0);
+
 
     return true;
 }
@@ -129,10 +136,21 @@ void loop(){
         glAttachShader(shaderProg, vertexShader);
         glAttachShader(shaderProg, fragShader);
         glLinkProgram(shaderProg);
+        GLint result;
+        glGetProgramiv(shaderProg, GL_LINK_STATUS, &result);
+        if(result == GL_FALSE)
+        {
+            char infoLog[512] = {0};
+            GLsizei logLeng;
+            glGetProgramInfoLog(shaderProg, 512, &logLeng, infoLog);
+            printf("Error linking shader:\n%s\n", infoLog);
+        }
 
         // Delete our shaders, gpu has them now.
         glDeleteShader(vertexShader);
         glDeleteShader(fragShader);
+
+        if(result == GL_FALSE) return;
     }
 
     // Set up stride, data types, etc in our buffer
