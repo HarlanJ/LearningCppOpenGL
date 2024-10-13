@@ -32,8 +32,8 @@ vec3 unpackPos(){
 
 vec2 unpackUv(){
     return vec2(
-        verts[gl_VertexID].position[0],
-        verts[gl_VertexID].position[1]
+        verts[gl_VertexID].uv[0],
+        verts[gl_VertexID].uv[1]
     );
 }
 
@@ -215,11 +215,7 @@ void loop(){
     }
 
     while(!glfwWindowShouldClose(window)){
-        // Wiggle the top of the triangle and refresh the GPU's data
-        // triangleVerts[6] = sin(glfwGetTime()/1);
-        // glBufferSubData(GL_SHADER_STORAGE_BUFFER, 6*sizeof(float), sizeof(float), &triangleVerts[6]);
-
-        // Actually clear the render buffer
+        // Clear the render buffer
         glClear(GL_COLOR_BUFFER_BIT);
         
         // Set the shader to use
