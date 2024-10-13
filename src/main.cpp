@@ -1,8 +1,11 @@
 #include <stdio.h>
 #include <cmath>
 
-#include <glad/glad.h>
+#include "glad/glad.h"
 #include <GLFW/glfw3.h>
+
+#define STB_IMAGE_IMPLEMENTATION
+#include "stb/stb_image.h"
 
 GLFWwindow* window;
 
@@ -29,8 +32,8 @@ vec3 unpackPos(){
 
 vec2 unpackUv(){
     return vec2(
-        verts[gl_VertexID].position[0],
-        verts[gl_VertexID].position[1]
+        verts[gl_VertexID].uv[0],
+        verts[gl_VertexID].uv[1]
     );
 }
 
@@ -45,11 +48,12 @@ const char * fragShaderSource = R""""(
 #version 460 core
 in vec2 uv;
 
+uniform sampler2D ourTexture;
+
 out vec4 FragColor;
 
 void main(){
-    // FragColor = vec4(1.0f, 0.5f, 0.2f, 1.0f);
-    FragColor = vec4((uv.xy+1.0f)/2.0f, 0.0f, 1.0f);
+    FragColor = texture(ourTexture, uv);
 }
 )"""";          
 
@@ -144,10 +148,42 @@ void loop(){
         float pos[3];
         float uv[2];
     } triangleVerts[] = {
-        { {-1, -1, 0}, {-1, -1} },
-        { { 1, -1, 0}, { 1, -1} },
-        { { 0,  1, 0}, { 0,  1} },
+        { { -.95, -.95, 0}, { 0,  0} },
+        { {  .95, -.95, 0}, { 1,  0} },
+        { {  .95,  .95, 0}, { 1,  1} },
+
+        { { -.95, -.95, 0}, { 0,  0} },
+        { {  .95,  .95, 0}, { 1,  1} },
+        { { -.95,  .95, 0}, { 0,  1} },
     };
+
+    unsigned int texture;
+    {
+        struct {
+            int width, height;
+            int numCh;
+        } imageStats;
+        unsigned char* imageRaw = stbi_load("/home/john/Downloads/container.jpg", &imageStats.width, &imageStats.height, &imageStats.numCh, 0);
+
+        glActiveTexture(GL_TEXTURE0);
+        // glCreateTextures(GL_TEXTURE_2D, 1, &texture);
+        glGenTextures(1, &texture);
+        glBindTexture(GL_TEXTURE_2D, texture);
+        glTextureParameteri(texture, GL_TEXTURE_WRAP_S, GL_REPEAT);
+        glTextureParameteri(texture, GL_TEXTURE_WRAP_T, GL_REPEAT);
+        glTextureParameteri(texture, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+        glTextureParameteri(texture, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+        // glTextureStorage2D(texture, 1, GL_RGBA32F, imageStats.width, imageStats.height);
+        if(imageRaw){
+            glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, imageStats.width, imageStats.height, 0, GL_RGB, GL_UNSIGNED_BYTE, imageRaw);
+            glGenerateMipmap(GL_TEXTURE_2D);
+            glBindTexture(GL_TEXTURE_2D, texture);
+        } else {
+            printf("Failed to load texture\n");
+        }
+
+        stbi_image_free(imageRaw);
+    }
 
     GLuint ssbo;
     glCreateBuffers(1, &ssbo);
@@ -179,17 +215,13 @@ void loop(){
     }
 
     while(!glfwWindowShouldClose(window)){
-        // Wiggle the top of the triangle and refresh the GPU's data
-        // triangleVerts[6] = sin(glfwGetTime()/1);
-        // glBufferSubData(GL_SHADER_STORAGE_BUFFER, 6*sizeof(float), sizeof(float), &triangleVerts[6]);
-
-        // Actually clear the render buffer
+        // Clear the render buffer
         glClear(GL_COLOR_BUFFER_BIT);
         
         // Set the shader to use
         glUseProgram(shaderProg);
         // Draw the triangle
-        glDrawArrays(GL_TRIANGLES, 0 ,3);
+        glDrawArrays(GL_TRIANGLES, 0, 6);
 
         // Swap render and display buffers
         glfwSwapBuffers(window);
@@ -200,6 +232,7 @@ void loop(){
 
     // Unbind the storage buffer from ssbo
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
+    glBindTexture(GL_TEXTURE_2D, 0);
 }
 
 int main()
