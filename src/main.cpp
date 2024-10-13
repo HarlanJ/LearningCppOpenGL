@@ -48,12 +48,15 @@ const char * fragShaderSource = R""""(
 #version 460 core
 in vec2 uv;
 
-uniform sampler2D ourTexture;
+uniform layout(binding=1) sampler2D tex1;
+uniform layout(binding=2) sampler2D tex2;
+
+uniform float time;
 
 out vec4 FragColor;
 
 void main(){
-    FragColor = texture(ourTexture, uv);
+    FragColor = texture(tex1, uv)*max(0,sin(time)) + texture(tex2, uv)*max(0,sin(time)*-1);
 }
 )"""";          
 
@@ -148,36 +151,44 @@ void loop(){
         float pos[3];
         float uv[2];
     } triangleVerts[] = {
-        { { -.95, -.95, 0}, { 0,  0} },
-        { {  .95, -.95, 0}, { 1,  0} },
-        { {  .95,  .95, 0}, { 1,  1} },
+        { { -.95, -.95, 0}, { 0,  1} },
+        { {  .95, -.95, 0}, { 1,  1} },
+        { {  .95,  .95, 0}, { 1,  0} },
 
-        { { -.95, -.95, 0}, { 0,  0} },
-        { {  .95,  .95, 0}, { 1,  1} },
-        { { -.95,  .95, 0}, { 0,  1} },
+        { { -.95, -.95, 0}, { 0,  1} },
+        { {  .95,  .95, 0}, { 1,  0} },
+        { { -.95,  .95, 0}, { 0,  0} },
     };
 
-    unsigned int texture;
-    {
+    const struct{
+        const char* img;
+        const GLenum tex;
+    } images[] = {
+        {"assets/bird.jpg", GL_TEXTURE1},
+        {"assets/container.jpg", GL_TEXTURE2},
+    };
+
+    for(size_t i = 0; i < 2; i++){
+        unsigned int tex;
+
         struct {
             int width, height;
             int numCh;
         } imageStats;
-        unsigned char* imageRaw = stbi_load("/home/john/Downloads/container.jpg", &imageStats.width, &imageStats.height, &imageStats.numCh, 0);
+        unsigned char* imageRaw = stbi_load(images[i].img, &imageStats.width, &imageStats.height, &imageStats.numCh, 0);
 
-        glActiveTexture(GL_TEXTURE0);
-        // glCreateTextures(GL_TEXTURE_2D, 1, &texture);
-        glGenTextures(1, &texture);
-        glBindTexture(GL_TEXTURE_2D, texture);
-        glTextureParameteri(texture, GL_TEXTURE_WRAP_S, GL_REPEAT);
-        glTextureParameteri(texture, GL_TEXTURE_WRAP_T, GL_REPEAT);
-        glTextureParameteri(texture, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-        glTextureParameteri(texture, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+        glActiveTexture(images[i].tex);
+        glGenTextures(1, &tex);
+        glBindTexture(GL_TEXTURE_2D, tex);
+        glTextureParameteri(tex, GL_TEXTURE_WRAP_S, GL_REPEAT);
+        glTextureParameteri(tex, GL_TEXTURE_WRAP_T, GL_REPEAT);
+        glTextureParameteri(tex, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+        glTextureParameteri(tex, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
         // glTextureStorage2D(texture, 1, GL_RGBA32F, imageStats.width, imageStats.height);
         if(imageRaw){
             glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, imageStats.width, imageStats.height, 0, GL_RGB, GL_UNSIGNED_BYTE, imageRaw);
             glGenerateMipmap(GL_TEXTURE_2D);
-            glBindTexture(GL_TEXTURE_2D, texture);
+            glBindTexture(GL_TEXTURE_2D, tex);
         } else {
             printf("Failed to load texture\n");
         }
@@ -214,12 +225,15 @@ void loop(){
         if(result == GL_FALSE) return;
     }
 
+    const auto timeLoc = glGetUniformLocation(shaderProg, "time");
+
     while(!glfwWindowShouldClose(window)){
         // Clear the render buffer
         glClear(GL_COLOR_BUFFER_BIT);
         
         // Set the shader to use
         glUseProgram(shaderProg);
+        glUniform1f(timeLoc, glfwGetTime());
         // Draw the triangle
         glDrawArrays(GL_TRIANGLES, 0, 6);
 
