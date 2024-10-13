@@ -1,6 +1,6 @@
-.PHONY: test build clean
+.PHONY: test build clean rebuild
 
-linkLibs := m glfw GL
+linkLibs := glfw GL
 incDirs  := include
 
 srcFiles := src/*
@@ -17,3 +17,5 @@ test: build
 
 clean:
 	rm -rf output
+
+rebuild: clean build
