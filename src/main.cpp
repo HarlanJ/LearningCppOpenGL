@@ -1,11 +1,11 @@
 #include <stdio.h>
 #include <cmath>
 
-#include <glad/glad.h>
+#include "glad/glad.h"
 #include <GLFW/glfw3.h>
 
 #define STB_IMAGE_IMPLEMENTATION
-#include <stb/stb_image.h>
+#include "stb/stb_image.h"
 
 GLFWwindow* window;
 

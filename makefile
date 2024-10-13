@@ -1,6 +1,6 @@
 .PHONY: test build clean rebuild
 
-linkLibs := glfw GL
+linkLibs := m glfw GL
 incDirs  := include
 
 srcFiles := src/*
@@ -12,7 +12,7 @@ build:
 	mkdir -p output
 	gcc -o output/helloWorld $(srcFiles) $(linkLine) $(incLine)
 
-test: build
+test: rebuild
 	./output/helloWorld
 
 clean:
