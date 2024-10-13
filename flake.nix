@@ -26,6 +26,8 @@
 
             pkgs.libGL
             pkgs.glfw
+
+            pkgs.stb
           ];
           buildPhase  = "gcc -o helloWorld src/* -lm -lglfw -lGL -Iinclude";
           installPhase = "mkdir -p $out/bin; install -t $out/bin helloWorld";
