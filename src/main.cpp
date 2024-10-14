@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include <cmath>
+#include <fstream>
 
 #include "glad/glad.h"
 #include <GLFW/glfw3.h>
@@ -9,63 +10,35 @@
 
 GLFWwindow* window;
 
-const char * vertexShaderSource = R""""(
-#version 460 core
-struct Vert {
-    float position[3];
-    float uv[2];
-};
 
-layout (binding = 0, std430) buffer ssbo {
-    Vert[] verts;
-};
+unsigned int loadCompileShader(const char* fName, GLenum shaderType)
+{
+    constexpr GLint bufSize = 256;
 
-out vec2 uv;
+    std::ifstream fs;
+    fs.open(fName, std::ifstream::in);
 
-vec3 unpackPos(){
-    return vec3(
-        verts[gl_VertexID].position[0],
-        verts[gl_VertexID].position[1],
-        verts[gl_VertexID].position[2]
-    );
-}
+    if(fs.fail()){
+        printf("Failed to open file \'%s\'\n", fName);
+    }
 
-vec2 unpackUv(){
-    return vec2(
-        verts[gl_VertexID].uv[0],
-        verts[gl_VertexID].uv[1]
-    );
-}
+    fs.seekg(0, fs.end);
+    GLint len = fs.tellg();
+    fs.seekg(0, fs.beg);
 
-void main(){
-    gl_Position = vec4(unpackPos(), 1.0f);
-    uv = unpackUv();
-}
-)"""";
+    printf("len: %d\n", len);
 
+    char* src = new char[len];
+    fs.read(src, len);
+    printf("%.*s\n", len, src);
 
-const char * fragShaderSource = R""""(
-#version 460 core
-in vec2 uv;
-
-uniform layout(binding=0) sampler2D tex1;
-uniform layout(binding=1) sampler2D tex2;
-
-uniform float time;
-
-out vec4 FragColor;
-
-void main(){
-    FragColor = texture(tex1, uv)*max(0,sin(time)) + texture(tex2, uv)*max(0,sin(time)*-1);
-}
-)"""";          
-
-unsigned int compileShader(const char* shaderSource, GLenum shaderType){
     // Get a shader handle from OpenGL
     unsigned int shader = glCreateShader(shaderType);
     // provide the GLSL source and compile it
-    glShaderSource(shader, 1, &shaderSource, NULL);
+    glShaderSource(shader, 1, &src, &len);
     glCompileShader(shader);
+
+    delete[] src;
 
     // Check for errors
     struct {
@@ -200,8 +173,8 @@ void loop(){
 
     unsigned int shaderProg = glCreateProgram();
     {
-        auto vertexShader = compileShader(vertexShaderSource, GL_VERTEX_SHADER);
-        auto fragShader   = compileShader(fragShaderSource,   GL_FRAGMENT_SHADER);
+        auto vertexShader = loadCompileShader("assets/shaders/vertex.glsl", GL_VERTEX_SHADER);
+        auto fragShader   = loadCompileShader("assets/shaders/frag.glsl",   GL_FRAGMENT_SHADER);
         glAttachShader(shaderProg, vertexShader);
         glAttachShader(shaderProg, fragShader);
         glLinkProgram(shaderProg);
