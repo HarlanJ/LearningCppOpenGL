@@ -48,8 +48,8 @@ const char * fragShaderSource = R""""(
 #version 460 core
 in vec2 uv;
 
-uniform layout(binding=1) sampler2D tex1;
-uniform layout(binding=2) sampler2D tex2;
+uniform layout(binding=0) sampler2D tex1;
+uniform layout(binding=1) sampler2D tex2;
 
 uniform float time;
 
@@ -164,8 +164,8 @@ void loop(){
         const char* img;
         const GLenum tex;
     } images[] = {
-        {"assets/bird.jpg", GL_TEXTURE1},
-        {"assets/container.jpg", GL_TEXTURE2},
+        {"assets/container.jpg", 0},
+        {"assets/bird.jpg", 1},
     };
 
     for(size_t i = 0; i < 2; i++){
@@ -176,19 +176,16 @@ void loop(){
             int numCh;
         } imageStats;
         unsigned char* imageRaw = stbi_load(images[i].img, &imageStats.width, &imageStats.height, &imageStats.numCh, 0);
-
-        glActiveTexture(images[i].tex);
-        glGenTextures(1, &tex);
-        glBindTexture(GL_TEXTURE_2D, tex);
-        glTextureParameteri(tex, GL_TEXTURE_WRAP_S, GL_REPEAT);
-        glTextureParameteri(tex, GL_TEXTURE_WRAP_T, GL_REPEAT);
-        glTextureParameteri(tex, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-        glTextureParameteri(tex, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-        // glTextureStorage2D(texture, 1, GL_RGBA32F, imageStats.width, imageStats.height);
+        
         if(imageRaw){
-            glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, imageStats.width, imageStats.height, 0, GL_RGB, GL_UNSIGNED_BYTE, imageRaw);
-            glGenerateMipmap(GL_TEXTURE_2D);
-            glBindTexture(GL_TEXTURE_2D, tex);
+            glCreateTextures(GL_TEXTURE_2D, 1, &tex);
+            glTextureParameteri(tex, GL_TEXTURE_WRAP_S, GL_REPEAT);
+            glTextureParameteri(tex, GL_TEXTURE_WRAP_T, GL_REPEAT);
+            glTextureParameteri(tex, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+            glTextureParameteri(tex, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+            glTextureStorage2D(tex, 1, GL_RGBA32F, imageStats.width, imageStats.height);
+            glTextureSubImage2D(tex, 0, 0, 0, imageStats.width, imageStats.height, GL_RGB, GL_UNSIGNED_BYTE, imageRaw);
+            glBindTextureUnit(images[i].tex, tex);
         } else {
             printf("Failed to load texture\n");
         }
