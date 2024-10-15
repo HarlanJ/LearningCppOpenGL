@@ -13,8 +13,7 @@ GLFWwindow* window;
 
 unsigned int loadCompileShader(const char* fName, GLenum shaderType)
 {
-    constexpr GLint bufSize = 256;
-
+    // File stream to load shader at runtime
     std::ifstream fs;
     fs.open(fName, std::ifstream::in);
 
@@ -22,15 +21,14 @@ unsigned int loadCompileShader(const char* fName, GLenum shaderType)
         printf("Failed to open file \'%s\'\n", fName);
     }
 
+    // get the length of the file
     fs.seekg(0, fs.end);
     GLint len = fs.tellg();
     fs.seekg(0, fs.beg);
 
-    printf("len: %d\n", len);
-
+    // Read the whole file into memory
     char* src = new char[len];
     fs.read(src, len);
-    printf("%.*s\n", len, src);
 
     // Get a shader handle from OpenGL
     unsigned int shader = glCreateShader(shaderType);
@@ -38,6 +36,7 @@ unsigned int loadCompileShader(const char* fName, GLenum shaderType)
     glShaderSource(shader, 1, &src, &len);
     glCompileShader(shader);
 
+    // We can delete the memory we allocated for the shader source, gpu has it now
     delete[] src;
 
     // Check for errors
@@ -94,13 +93,12 @@ bool init(){
 
     glfwMakeContextCurrent(window);
 
-    // Load an OpenGL extension loader
+    // Load an OpenGL loader
     if(!gladLoadGLLoader((GLADloadproc)glfwGetProcAddress))
     {
         glfwTerminate();
         printf("Failed to get GL Loader\n");
         return false;
-
     }
 
     glDebugMessageCallback(glErrorPrinter, nullptr);
@@ -113,7 +111,6 @@ bool init(){
 
     // Set the bg color
     glClearColor(.1, .1, .1, 0.0);
-
 
     return true;
 }
@@ -133,6 +130,7 @@ void loop(){
         { { -.95,  .95, 0}, { 0,  0} },
     };
 
+    // Simple anon struct to manage image files and what texture to bind them to
     const struct{
         const char* img;
         const GLenum tex;
@@ -141,6 +139,7 @@ void loop(){
         {"assets/bird.jpg", 1},
     };
 
+    // Generate texture objects for each of  the images
     for(size_t i = 0; i < 2; i++){
         unsigned int tex;
 
@@ -166,11 +165,13 @@ void loop(){
         stbi_image_free(imageRaw);
     }
 
+    // Generate buffer for vert data
     GLuint ssbo;
     glCreateBuffers(1, &ssbo);
     glNamedBufferStorage(ssbo, sizeof(triangleVerts), triangleVerts, GL_DYNAMIC_STORAGE_BIT);
     glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 0, ssbo);
 
+    // Compile and link shaders
     unsigned int shaderProg = glCreateProgram();
     {
         auto vertexShader = loadCompileShader("assets/shaders/vertex.glsl", GL_VERTEX_SHADER);
@@ -195,6 +196,7 @@ void loop(){
         if(result == GL_FALSE) return;
     }
 
+    // Get location of `time` uniform in the shader program
     const auto timeLoc = glGetUniformLocation(shaderProg, "time");
 
     while(!glfwWindowShouldClose(window)){
