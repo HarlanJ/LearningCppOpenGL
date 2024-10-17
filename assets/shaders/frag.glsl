@@ -12,4 +12,5 @@ const float pi = 3.1415926535;
 
 void main(){
     FragColor = (texture(tex1, uv)*(sin(time)+1)/2.0f) + (texture(tex2, uv)*(sin(time+pi)+1)/2.0f);
+    // FragColor = vec4(gl_FragCoord.zzz, 1.0);
 }

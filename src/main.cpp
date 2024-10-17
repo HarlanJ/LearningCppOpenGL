@@ -110,7 +110,12 @@ bool init(){
     glfwShowWindow(window);
 
     // Set the bg color
-    glClearColor(.1, .1, .1, 0.0);
+    glClearColor(1.0, 0.0, 0.0, 0.0);
+
+    glDepthMask(GL_TRUE);
+    glEnable(GL_DEPTH_TEST);
+    // glDepthFunc(GL_LESS);
+    glDepthFunc(GL_GREATER);
 
     return true;
 }
@@ -124,9 +129,18 @@ void loop(){
     glTextureParameteri(fb_tex, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
     glTextureStorage2D(fb_tex, 1, GL_RGBA32F, 400, 400);
 
+    GLuint fb_depthBuf;
+    glCreateTextures(GL_TEXTURE_DEPTH, 1, &fb_depthBuf);
+    glTextureParameteri(fb_depthBuf, GL_TEXTURE_WRAP_S, GL_REPEAT);
+    glTextureParameteri(fb_depthBuf, GL_TEXTURE_WRAP_T, GL_REPEAT);
+    glTextureParameteri(fb_depthBuf, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTextureParameteri(fb_depthBuf, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    glTextureStorage2D(fb_depthBuf, 1, GL_DEPTH_COMPONENT32F, 400, 400);
+
     GLuint fbo;
     glCreateFramebuffers(1, &fbo);
     glNamedFramebufferTexture(fbo, GL_COLOR_ATTACHMENT0, fb_tex, 0);
+    glNamedFramebufferTexture(fbo, GL_DEPTH_ATTACHMENT, fb_depthBuf, 0);
     glNamedFramebufferDrawBuffer(fbo, GL_COLOR_ATTACHMENT0);
     if(glCheckNamedFramebufferStatus(fbo, GL_FRAMEBUFFER)){
         printf("Error in fbo\n");
@@ -144,6 +158,10 @@ void loop(){
         { { -.95, -.95, 0}, { 0,  1} },
         { {  .95,  .95, 0}, { 1,  0} },
         { { -.95,  .95, 0}, { 0,  0} },
+        
+        { { -.50, -.50, .5}, { 0,  0} },
+        { {  .50,  .50, .5}, { 0,  0} },
+        { { -.50,  .50, .5}, { 0,  0} },
     };
 
     // Simple anon struct to manage image files and what texture to bind them to
@@ -216,10 +234,10 @@ void loop(){
     const auto timeLoc = glGetUniformLocation(shaderProg, "time");
 
     float bgColor[] = {1.0, 1.0, 0.0, 1.0};
+    float depthClear = 0;
     while(!glfwWindowShouldClose(window)){
-        
         // Clear the render buffer
-        // glClear(GL_COLOR_BUFFER_BIT);
+        glClearNamedFramebufferfv(fbo, GL_DEPTH, 0, &depthClear);
         glClearNamedFramebufferfv(fbo, GL_COLOR, 0, bgColor);
         // Bind the frame buffer so we can draw to it
         glBindFramebuffer(GL_FRAMEBUFFER, fbo);
@@ -228,9 +246,10 @@ void loop(){
         glUseProgram(shaderProg);
         glUniform1f(timeLoc, glfwGetTime());
         // Draw the triangle
-        glDrawArrays(GL_TRIANGLES, 0, 6);
+        glDrawArrays(GL_TRIANGLES, 0, 9);
 
         glBlitNamedFramebuffer(fbo, 0, 0, 0, 400, 400, 0, 0, 400, 400, GL_COLOR_BUFFER_BIT, GL_NEAREST);
+        glBlitNamedFramebuffer(fbo, 0, 0, 0, 400, 400, 0, 0, 400, 400, GL_DEPTH_BUFFER_BIT, GL_NEAREST);
 
         // Swap render and display buffers
         glfwSwapBuffers(window);
