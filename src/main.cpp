@@ -142,8 +142,10 @@ void loop(){
     glNamedFramebufferTexture(fbo, GL_COLOR_ATTACHMENT0, fb_tex, 0);
     glNamedFramebufferTexture(fbo, GL_DEPTH_ATTACHMENT, fb_depthBuf, 0);
     glNamedFramebufferDrawBuffer(fbo, GL_COLOR_ATTACHMENT0);
-    if(glCheckNamedFramebufferStatus(fbo, GL_FRAMEBUFFER)){
-        printf("Error in fbo\n");
+
+    GLuint err = glCheckNamedFramebufferStatus(fbo, GL_FRAMEBUFFER);
+    if(err != GL_FRAMEBUFFER_COMPLETE){
+        printf("Error in fbo: %x\n", err);
     }
 
     // Triangle vertex data
