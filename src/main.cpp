@@ -116,6 +116,22 @@ bool init(){
 }
 
 void loop(){
+    GLuint fb_tex;
+    glCreateTextures(GL_TEXTURE_2D, 1, &fb_tex);
+    glTextureParameteri(fb_tex, GL_TEXTURE_WRAP_S, GL_REPEAT);
+    glTextureParameteri(fb_tex, GL_TEXTURE_WRAP_T, GL_REPEAT);
+    glTextureParameteri(fb_tex, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTextureParameteri(fb_tex, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    glTextureStorage2D(fb_tex, 1, GL_RGBA32F, 400, 400);
+
+    GLuint fbo;
+    glCreateFramebuffers(1, &fbo);
+    glNamedFramebufferTexture(fbo, GL_COLOR_ATTACHMENT0, fb_tex, 0);
+    glNamedFramebufferDrawBuffer(fbo, GL_COLOR_ATTACHMENT0);
+    if(glCheckNamedFramebufferStatus(fbo, GL_FRAMEBUFFER)){
+        printf("Error in fbo\n");
+    }
+
     // Triangle vertex data
     struct {
         float pos[3];
@@ -199,15 +215,22 @@ void loop(){
     // Get location of `time` uniform in the shader program
     const auto timeLoc = glGetUniformLocation(shaderProg, "time");
 
+    float bgColor[] = {1.0, 1.0, 0.0, 1.0};
     while(!glfwWindowShouldClose(window)){
+        
         // Clear the render buffer
-        glClear(GL_COLOR_BUFFER_BIT);
+        // glClear(GL_COLOR_BUFFER_BIT);
+        glClearNamedFramebufferfv(fbo, GL_COLOR, 0, bgColor);
+        // Bind the frame buffer so we can draw to it
+        glBindFramebuffer(GL_FRAMEBUFFER, fbo);
         
         // Set the shader to use
         glUseProgram(shaderProg);
         glUniform1f(timeLoc, glfwGetTime());
         // Draw the triangle
         glDrawArrays(GL_TRIANGLES, 0, 6);
+
+        glBlitNamedFramebuffer(fbo, 0, 0, 0, 400, 400, 0, 0, 400, 400, GL_COLOR_BUFFER_BIT, GL_NEAREST);
 
         // Swap render and display buffers
         glfwSwapBuffers(window);
@@ -219,6 +242,7 @@ void loop(){
     // Unbind the storage buffer from ssbo
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
     glBindTexture(GL_TEXTURE_2D, 0);
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
 }
 
 int main()
