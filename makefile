@@ -11,7 +11,7 @@ incLine  := $(foreach dir,$(incDirs),-I$(dir)/)
 build:
 	mkdir -p output
 	cp -r assets output/assets
-	gcc -o output/helloWorld $(srcFiles) $(linkLine) $(incLine)
+	g++ -o output/helloWorld $(srcFiles) $(linkLine) $(incLine)
 
 test: rebuild
 	./output/helloWorld

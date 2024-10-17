@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include <cmath>
+#include <fstream>
 
 #include "glad/glad.h"
 #include <GLFW/glfw3.h>
@@ -9,63 +10,34 @@
 
 GLFWwindow* window;
 
-const char * vertexShaderSource = R""""(
-#version 460 core
-struct Vert {
-    float position[3];
-    float uv[2];
-};
 
-layout (binding = 0, std430) buffer ssbo {
-    Vert[] verts;
-};
+unsigned int loadCompileShader(const char* fName, GLenum shaderType)
+{
+    // File stream to load shader at runtime
+    std::ifstream fs;
+    fs.open(fName, std::ifstream::in);
 
-out vec2 uv;
+    if(fs.fail()){
+        printf("Failed to open file \'%s\'\n", fName);
+    }
 
-vec3 unpackPos(){
-    return vec3(
-        verts[gl_VertexID].position[0],
-        verts[gl_VertexID].position[1],
-        verts[gl_VertexID].position[2]
-    );
-}
+    // get the length of the file
+    fs.seekg(0, fs.end);
+    GLint len = fs.tellg();
+    fs.seekg(0, fs.beg);
 
-vec2 unpackUv(){
-    return vec2(
-        verts[gl_VertexID].uv[0],
-        verts[gl_VertexID].uv[1]
-    );
-}
+    // Read the whole file into memory
+    char* src = new char[len];
+    fs.read(src, len);
 
-void main(){
-    gl_Position = vec4(unpackPos(), 1.0f);
-    uv = unpackUv();
-}
-)"""";
-
-
-const char * fragShaderSource = R""""(
-#version 460 core
-in vec2 uv;
-
-uniform layout(binding=0) sampler2D tex1;
-uniform layout(binding=1) sampler2D tex2;
-
-uniform float time;
-
-out vec4 FragColor;
-
-void main(){
-    FragColor = texture(tex1, uv)*max(0,sin(time)) + texture(tex2, uv)*max(0,sin(time)*-1);
-}
-)"""";          
-
-unsigned int compileShader(const char* shaderSource, GLenum shaderType){
     // Get a shader handle from OpenGL
     unsigned int shader = glCreateShader(shaderType);
     // provide the GLSL source and compile it
-    glShaderSource(shader, 1, &shaderSource, NULL);
+    glShaderSource(shader, 1, &src, &len);
     glCompileShader(shader);
+
+    // We can delete the memory we allocated for the shader source, gpu has it now
+    delete[] src;
 
     // Check for errors
     struct {
@@ -121,13 +93,12 @@ bool init(){
 
     glfwMakeContextCurrent(window);
 
-    // Load an OpenGL extension loader
+    // Load an OpenGL loader
     if(!gladLoadGLLoader((GLADloadproc)glfwGetProcAddress))
     {
         glfwTerminate();
         printf("Failed to get GL Loader\n");
         return false;
-
     }
 
     glDebugMessageCallback(glErrorPrinter, nullptr);
@@ -140,7 +111,6 @@ bool init(){
 
     // Set the bg color
     glClearColor(.1, .1, .1, 0.0);
-
 
     return true;
 }
@@ -160,6 +130,7 @@ void loop(){
         { { -.95,  .95, 0}, { 0,  0} },
     };
 
+    // Simple anon struct to manage image files and what texture to bind them to
     const struct{
         const char* img;
         const GLenum tex;
@@ -168,6 +139,7 @@ void loop(){
         {"assets/bird.jpg", 1},
     };
 
+    // Generate texture objects for each of  the images
     for(size_t i = 0; i < 2; i++){
         unsigned int tex;
 
@@ -193,15 +165,17 @@ void loop(){
         stbi_image_free(imageRaw);
     }
 
+    // Generate buffer for vert data
     GLuint ssbo;
     glCreateBuffers(1, &ssbo);
     glNamedBufferStorage(ssbo, sizeof(triangleVerts), triangleVerts, GL_DYNAMIC_STORAGE_BIT);
     glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 0, ssbo);
 
+    // Compile and link shaders
     unsigned int shaderProg = glCreateProgram();
     {
-        auto vertexShader = compileShader(vertexShaderSource, GL_VERTEX_SHADER);
-        auto fragShader   = compileShader(fragShaderSource,   GL_FRAGMENT_SHADER);
+        auto vertexShader = loadCompileShader("assets/shaders/vertex.glsl", GL_VERTEX_SHADER);
+        auto fragShader   = loadCompileShader("assets/shaders/frag.glsl",   GL_FRAGMENT_SHADER);
         glAttachShader(shaderProg, vertexShader);
         glAttachShader(shaderProg, fragShader);
         glLinkProgram(shaderProg);
@@ -222,6 +196,7 @@ void loop(){
         if(result == GL_FALSE) return;
     }
 
+    // Get location of `time` uniform in the shader program
     const auto timeLoc = glGetUniformLocation(shaderProg, "time");
 
     while(!glfwWindowShouldClose(window)){
