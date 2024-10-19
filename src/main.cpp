@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <cmath>
 #include <fstream>
+#include <map>
 
 #include "glad/glad.h"
 #include <GLFW/glfw3.h>
@@ -74,9 +75,95 @@ void glfwErrorPrinter(int code, const char* desc){
     printf("Error code: %d\n%s\n", code, desc);
 }
 
+struct ErrorPrinterConfig{
+    enum SeverityBits:uint8_t{
+        HIGH   = 0x08,
+        MEDIUM = 0x04,
+        LOW    = 0x02,
+        NOTIF  = 0x01,
+    };
+
+    uint8_t severityIgnore;
+};
+
 void glErrorPrinter(GLenum source, GLenum type, GLuint id, GLenum severity, GLsizei length, const GLchar* message, const void * userParam){
-    printf("GL error\n\tsource: %d\n\ttype: %d\n\tid: %d\n\tseverity: %d\n\t%s", source, type, id, severity, message);
+    const ErrorPrinterConfig* conf = reinterpret_cast<const ErrorPrinterConfig*>(userParam);
+
+    switch(severity){
+        case GL_DEBUG_SEVERITY_LOW:
+            if(conf->severityIgnore & ErrorPrinterConfig::LOW) return;
+        break;
+
+        case GL_DEBUG_SEVERITY_MEDIUM:
+            if(conf->severityIgnore & ErrorPrinterConfig::MEDIUM) return;
+        break;
+
+        case GL_DEBUG_SEVERITY_HIGH:
+            if(conf->severityIgnore & ErrorPrinterConfig::HIGH) return;
+        break;
+
+        case GL_DEBUG_SEVERITY_NOTIFICATION:
+            if(conf->severityIgnore & ErrorPrinterConfig::NOTIF) return;
+        break;
+
+    }
+
+    const std::map<const GLenum, const char*> stringifyEnums{
+        {GL_DEBUG_SEVERITY_LOW,          "LOW"         },
+        {GL_DEBUG_SEVERITY_MEDIUM,       "MEDIUM"      },
+        {GL_DEBUG_SEVERITY_HIGH,         "HIGH"        },
+        {GL_DEBUG_SEVERITY_NOTIFICATION, "NOTIFICATION"},
+
+        {GL_DEBUG_SOURCE_API,             "GL API"},
+        {GL_DEBUG_SOURCE_APPLICATION,     "application"},
+        {GL_DEBUG_SOURCE_SHADER_COMPILER, "shader compiler"},
+        {GL_DEBUG_SOURCE_THIRD_PARTY,     "3rd party"},
+        {GL_DEBUG_SOURCE_WINDOW_SYSTEM,   "window system"},
+        {GL_DEBUG_SOURCE_OTHER,           "other"},
+
+        {GL_DEBUG_TYPE_DEPRECATED_BEHAVIOR, "DEPRECATED BEHAVIOR"},
+        {GL_DEBUG_TYPE_ERROR,               "ERROR"              },
+        {GL_DEBUG_TYPE_MARKER,              "MARKER"             },
+        {GL_DEBUG_TYPE_PERFORMANCE,         "PERFORMANCE"        },
+        {GL_DEBUG_TYPE_PORTABILITY,         "PORTABILITY"        },
+        {GL_DEBUG_TYPE_POP_GROUP,           "POP_GROUP"          },
+        {GL_DEBUG_TYPE_PUSH_GROUP,          "PUSH_GROUP"         },
+        {GL_DEBUG_TYPE_UNDEFINED_BEHAVIOR,  "UNDEFINED_BEHAVIOR" },
+        {GL_DEBUG_TYPE_OTHER,               "OTHER"              },
+    };
+
+    const std::map<const GLenum, const unsigned int> severityCols{
+        {GL_DEBUG_SEVERITY_HIGH,         31 }, // Red
+        {GL_DEBUG_SEVERITY_MEDIUM,       33 }, // yellow
+        {GL_DEBUG_SEVERITY_LOW,          32 }, // Green
+        {GL_DEBUG_SEVERITY_NOTIFICATION, 37 }, // white
+    };
+
+    bool finalPrint = true;
+
+    if(stringifyEnums.count(source)==0){
+        printf("GL ERROR, UNKNOWN SOURCE:%d / 0x%X\n", source, source);
+        finalPrint = false;
+    }
+
+    if(stringifyEnums.count(type)==0)
+    {
+        printf("GL ERROR, UNKNOWN TYPE:%d / 0x%X\n", type, type);
+        finalPrint=false;
+    }
+
+    if(stringifyEnums.count(severity)==0)
+    {
+        printf("GL ERROR, UNKNOWN SEVERITY:%d / 0x%X\n", severity, severity);
+        finalPrint=false;
+    }
+    
+    if(finalPrint) printf("\033[%dmGL error from %s, %s severity\n\tError id: %d\n\t%s: %s\033[m\n\n", severityCols.at(severity), stringifyEnums.at(source), stringifyEnums.at(severity), id, stringifyEnums.at(type), message);
 }
+
+ErrorPrinterConfig errorConf{
+    ErrorPrinterConfig::NOTIF
+};
 
 bool init(){
     glfwSetErrorCallback(glfwErrorPrinter);
@@ -101,7 +188,9 @@ bool init(){
         return false;
     }
 
-    glDebugMessageCallback(glErrorPrinter, nullptr);
+    glEnable(GL_DEBUG_OUTPUT);
+    glEnable(GL_DEBUG_OUTPUT_SYNCHRONOUS);
+    glDebugMessageCallback(glErrorPrinter, &errorConf);
 
     // Enable V-Sync
     glfwSwapInterval(1);
@@ -114,8 +203,8 @@ bool init(){
 
     glDepthMask(GL_TRUE);
     glEnable(GL_DEPTH_TEST);
-    // glDepthFunc(GL_LESS);
-    glDepthFunc(GL_GREATER);
+    glDepthFunc(GL_LESS);
+    // glDepthFunc(GL_GREATER);
 
     return true;
 }
@@ -130,7 +219,7 @@ void loop(){
     glTextureStorage2D(fb_tex, 1, GL_RGBA32F, 400, 400);
 
     GLuint fb_depthBuf;
-    glCreateTextures(GL_TEXTURE_DEPTH, 1, &fb_depthBuf);
+    glCreateTextures(GL_TEXTURE_2D, 1, &fb_depthBuf);
     glTextureParameteri(fb_depthBuf, GL_TEXTURE_WRAP_S, GL_REPEAT);
     glTextureParameteri(fb_depthBuf, GL_TEXTURE_WRAP_T, GL_REPEAT);
     glTextureParameteri(fb_depthBuf, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
@@ -236,10 +325,10 @@ void loop(){
     const auto timeLoc = glGetUniformLocation(shaderProg, "time");
 
     float bgColor[] = {1.0, 1.0, 0.0, 1.0};
-    float depthClear = 0;
+    float depthClear = 1;
     while(!glfwWindowShouldClose(window)){
         // Clear the render buffer
-        glClearNamedFramebufferfv(fbo, GL_DEPTH, 0, &depthClear);
+        glClearNamedFramebufferfi(fbo, GL_DEPTH_STENCIL, 0, depthClear, 0);
         glClearNamedFramebufferfv(fbo, GL_COLOR, 0, bgColor);
         // Bind the frame buffer so we can draw to it
         glBindFramebuffer(GL_FRAMEBUFFER, fbo);
